@@ -1253,3 +1253,158 @@ fi
 export ANDROID_BUILD_TOP=$(gettop)
 
 . $ANDROID_BUILD_TOP/vendor/lineage/build/envsetup.sh
+
+# CarpeDiem build commands: `carpe` configures, `cb` builds.
+function carpe() {
+    local device=""
+    local build_type=""
+    local gms_variant=""
+    local vanilla=false
+
+    for arg in "$@"; do
+        case "$arg" in
+            gms|mini|full|pico)
+                if [[ "$vanilla" == true ]]; then
+                    echo "Error: Cannot specify both GMS and vanilla."
+                    return 1
+                fi
+                if [[ -n "$gms_variant" ]]; then
+                    echo "Error: Multiple GMS variants specified ($gms_variant and $arg)."
+                    return 1
+                fi
+                gms_variant="$arg"
+                ;;
+            va|vanilla)
+                if [[ "$vanilla" == true ]]; then
+                    echo "Error: Vanilla already specified."
+                    return 1
+                fi
+                if [[ -n "$gms_variant" ]]; then
+                    echo "Error: Cannot specify both GMS and vanilla."
+                    return 1
+                fi
+                vanilla=true
+                ;;
+            user|userdebug|eng)
+                if [[ -n "$build_type" ]]; then
+                    echo "Error: Multiple build types specified ($build_type and $arg)."
+                    return 1
+                fi
+                build_type="$arg"
+                ;;
+            help|-h|--help)
+                carpe_help
+                return 0
+                ;;
+            *)
+                if [[ -n "$device" ]]; then
+                    echo "Error: Multiple device names detected ($device and $arg)."
+                    return 1
+                fi
+                device="$arg"
+                ;;
+        esac
+    done
+
+    if [[ -z "$device" ]]; then
+        echo "Correct usage: carpe <device_codename> [user|userdebug|eng] [gms|mini|full|pico|va]"
+        return 1
+    fi
+
+    if [[ -z "$build_type" ]]; then
+        build_type="userdebug"
+    fi
+
+    if [[ "$vanilla" == true ]]; then
+        export WITH_GMS=false
+        echo "Package type: VANILLA"
+    else
+        export WITH_GMS=true
+        case "$gms_variant" in
+            ""|gms|mini)
+                export GMS_MAKEFILE=gms_mini.mk
+                ;;
+            full)
+                export GMS_MAKEFILE=gms_full.mk
+                ;;
+            pico)
+                export GMS_MAKEFILE=gms_pico.mk
+                ;;
+            *)
+                echo "Error: Invalid GMS variant '$gms_variant'."
+                return 1
+                ;;
+        esac
+        echo "Package type: GMS ($GMS_MAKEFILE)"
+    fi
+
+    lunch lineage_"$device"-"$build_type"
+}
+
+function carpe_help() {
+    echo "carpe Usage: carpe <device_codename> [user|userdebug|eng] [gms|mini|full|pico|va]"
+    echo "  GMS variants: gms/mini (default), full, pico. Use 'va' for vanilla."
+    echo "cb Usage: cb [-b|-fb|-br] [-j<num>] [user|eng|userdebug] [device]"
+    echo "  -b: bacon, -fb: fastboot package, -br: brunch. Default runs plain 'm'."
+}
+
+function cb() {
+    local jCount=""
+    local cmd=""
+    local variant=""
+    local device=""
+
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^-j[0-9]+$ ]]; then
+            jCount="$arg"
+        elif [[ "$arg" =~ ^-(b|fb|br)$ ]]; then
+            cmd="${arg:1}"
+        elif [[ "$arg" =~ ^(user|eng|userdebug)$ ]]; then
+            variant="$arg"
+        elif [[ "$arg" == "help" ]]; then
+            carpe_help
+            return 0
+        else
+            device="$arg"
+        fi
+    done
+
+    if [[ -z "$jCount" ]]; then
+        jCount="-j$(nproc --all)"
+    fi
+
+    if [[ -n "$device" ]]; then
+        export TARGET_PRODUCT="lineage_$device"
+        echo "Setting target device to $device"
+    elif [[ -z "${TARGET_PRODUCT:-}" ]]; then
+        echo "Error: No device target set. Run 'carpe' or 'lunch' first."
+        return 1
+    fi
+
+    if [[ -n "$variant" ]]; then
+        export TARGET_BUILD_VARIANT="$variant"
+        echo "Setting build variant to $variant"
+    fi
+
+    if [[ -z "$cmd" ]]; then
+        echo "Running default 'm' build with $jCount"
+        m "$jCount"
+        return
+    fi
+
+    if [[ "$cmd" == "br" ]]; then
+        local targetDevice=$(echo "$TARGET_PRODUCT" | sed -E 's/lineage_([^_]+).*/\1/')
+        echo "Running brunch for device: $targetDevice with $jCount"
+        brunch "$targetDevice" "$TARGET_BUILD_VARIANT" "$jCount"
+        return
+    fi
+
+    case "$cmd" in
+        b)
+            m bacon "$jCount"
+            ;;
+        fb)
+            m updatepackage "$jCount"
+            ;;
+    esac
+}
