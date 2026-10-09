@@ -1340,6 +1340,8 @@ function carpe() {
     fi
 
     lunch lineage_"$device"-"$build_type"
+
+    carpe_help
 }
 
 function carpe_help() {
