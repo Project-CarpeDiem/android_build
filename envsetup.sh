@@ -1339,7 +1339,8 @@ function carpe() {
         echo "Package type: GMS ($GMS_MAKEFILE)"
     fi
 
-    lunch lineage_"$device"-"$build_type"
+    source "${ANDROID_BUILD_TOP}/vendor/lineage/vars/aosp_target_release"
+    lunch lineage_"$device"-"$aosp_target_release"-"$build_type"
 
     carpe_help
 }
