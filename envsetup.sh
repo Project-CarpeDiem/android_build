@@ -510,6 +510,12 @@ function _lunch_meat()
     if [[ -n "${CHECK_MU_CONFIG:-}" ]]; then
       check_mu_config
     fi
+
+    if [[ -z "${ANDROID_QUIET_BUILD:-}" ]]; then
+        echo ""
+        cat $(gettop)/build/make/carpediem_ascii_logo
+        echo ""
+    fi
 }
 
 function _lunch_usage()
