@@ -1315,13 +1315,14 @@ function carpe() {
         build_type="userdebug"
     fi
 
-    if [[ "$vanilla" == true ]]; then
+    if [[ "$vanilla" == true || -z "$gms_variant" ]]; then
         export WITH_GMS=false
+        unset GMS_MAKEFILE
         echo "Package type: VANILLA"
     else
         export WITH_GMS=true
         case "$gms_variant" in
-            ""|gms|mini)
+            gms|mini)
                 export GMS_MAKEFILE=gms_mini.mk
                 ;;
             full)
@@ -1343,7 +1344,7 @@ function carpe() {
 
 function carpe_help() {
     echo "carpe Usage: carpe <device_codename> [user|userdebug|eng] [gms|mini|full|pico|va]"
-    echo "  GMS variants: gms/mini (default), full, pico. Use 'va' for vanilla."
+    echo "  Default package is vanilla. GMS variants: gms/mini, full, pico."
     echo "cb Usage: cb [-b|-fb|-br] [-j<num>] [user|eng|userdebug] [device]"
     echo "  -b: bacon, -fb: fastboot package, -br: brunch. Default runs plain 'm'."
 }
